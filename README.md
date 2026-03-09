@@ -22,5 +22,6 @@ Above is a comparison between the default and the 'Compact' widgets. Both have t
 ## Tips/Caveats
 * Use this when you're about to first pull or a few minutes before so you can be sure every druid is tracked properly/everyone is in the raid. Don't use it mid raid or you will miss druid CDs if they happened to use them before.
 * If you disconnect or leave mid raid, the cooldowns **will reset** and you'll have to scan again. This is unavoidable.
+* [Untested] It is likely that if you die and have to ghost run back while the raid is ongoing (read: they can't/won't res you and just continue pulling), you may miss CDs. Try not to die, will you? :>
 ## Contributions
 Welcome contributions of any kind, particularly those related to optimization. This was coded using Codex magic and a healthy dose of reviewing, but I'm nowhere near an expert in archaic 2004 Lua and can only do so much. If you read through and spot silly things that could be improved, let me know!
