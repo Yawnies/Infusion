@@ -1,2 +1,2 @@
 # Infusion
-Utility tracker for druid Innervates/Rebirths.
+Utility tracker for druid Innervates/Rebirths. Will add more info later.
