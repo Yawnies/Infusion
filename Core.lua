@@ -200,7 +200,7 @@ function Infusion.ScanRaid()
 
     -- Abort if not in a raid
     if numRaid == 0 then
-        DEFAULT_CHAT_FRAME:AddMessage("Infusion: Must be in a raid group for the scanner to work!", 1.0, 0.2, 0.2)
+        DEFAULT_CHAT_FRAME:AddMessage("Infusion: Must be in a raid group for the scanner to work!", 1.0, 0.0, 0.0)
         Infusion.RefreshTrackingState()
         return
     end
@@ -227,7 +227,7 @@ function Infusion.ScanRaid()
     end
 
     if next(Infusion.scannedDruids) == nil then
-        DEFAULT_CHAT_FRAME:AddMessage("Infusion: No Druids found in the raid.", 1.0, 1.0, 0.0)
+        DEFAULT_CHAT_FRAME:AddMessage("Infusion: No Druids found in the raid.", 1.0, 0.0, 0.0)
     end
 
     Infusion.RefreshTrackingState()
