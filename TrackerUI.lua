@@ -125,8 +125,8 @@ local function GetLayout()
             leftPad = 0,
             rightPad = 0,
             nameGap = 4,
-            nameWidth = 48,
-            cdWidth = 40,
+            nameWidth = 76,
+            cdWidth = 32,
             readyText = "RDY",
             showFooter = false,
             showDrag = true,
@@ -402,6 +402,15 @@ function Infusion.CloseTrackers()
 
     if rebirthTrackerFrame then
         rebirthTrackerFrame:Hide()
+    end
+
+    -- Closing trackers also clears scan data so stale rows cannot be reused.
+    Infusion.scannedDruids = {}
+    Infusion.druids = {}
+    Infusion.rebirths = {}
+
+    if Infusion.RefreshTrackingState then
+        Infusion.RefreshTrackingState()
     end
 
     return wasVisible
