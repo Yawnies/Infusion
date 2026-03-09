@@ -1,8 +1,11 @@
+if not Infusion or Infusion.Disabled then
+    return
+end
+
 -- Create the Main UI Frame
 local mainUI = CreateFrame("Frame", "InfusionMainFrame", UIParent)
 mainUI:SetWidth(150)
-mainUI:SetHeight(220) -- 220
-mainUI:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+mainUI:SetHeight(270) -- 220 + 50 for Compact checkbox
 
 -- Black transparent background (no Blizzard border)
 mainUI:SetBackdrop({
@@ -24,13 +27,27 @@ end)
 mainUI:SetScript("OnMouseUp", function()
     if arg1 == "LeftButton" then
         this:StopMovingOrSizing()
+        if Infusion.SaveFramePosition then
+            Infusion.SaveFramePosition("main_ui", this)
+        end
     end
 end)
+
+if Infusion.RestoreFramePosition then
+    Infusion.RestoreFramePosition("main_ui", mainUI, "CENTER", UIParent, "CENTER", 0, 0)
+else
+    mainUI:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+end
 
 -- Title Heading ("Infusion")
 local title = mainUI:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 title:SetPoint("TOP", mainUI, "TOP", 0, -12)
 title:SetText("Infusion")
+
+-- Byline under title
+local byline = mainUI:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+byline:SetPoint("TOP", title, "BOTTOM", 0, -2)
+byline:SetText("by |cfff5b5ffYawnies|r!")
 
 -- Close Button (The 'X' in the top right)
 local closeBtn = CreateFrame("Button", nil, mainUI, "UIPanelCloseButton")
@@ -42,7 +59,7 @@ end)
 -- Description Text
 local desc = mainUI:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 desc:SetWidth(120)
-desc:SetPoint("TOP", title, "BOTTOM", 0, -15)
+desc:SetPoint("TOP", byline, "BOTTOM", 0, -12)
 desc:SetJustifyH("CENTER")
 desc:SetJustifyV("TOP")
 desc:SetText("A cute little addon that lets you know when Innervates and Rebirths are available.")
@@ -54,14 +71,6 @@ raidWarning:SetPoint("TOP", desc, "BOTTOM", 0, -10)
 raidWarning:SetJustifyH("CENTER")
 raidWarning:SetTextColor(1.0, 0.0, 0.0)
 raidWarning:SetText("Make sure you're in a raid group!")
-
--- SuperWoW requirement text (shown only when SuperWoW is unavailable)
-local superWoWWarning = mainUI:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-superWoWWarning:SetWidth(120)
-superWoWWarning:SetPoint("BOTTOM", mainUI, "BOTTOM", -32, 70)
-superWoWWarning:SetJustifyH("CENTER")
-superWoWWarning:SetTextColor(1.0, 0.2, 0.2)
-superWoWWarning:SetText("SuperWoW is required to scan your raid!")
 
 local function PrintHelp()
     local neonGreen = "|cff00ff00"
@@ -111,7 +120,7 @@ end
 local actionBtnWidth = 58
 local actionBtnHeight = 24
 local actionGap = 6
-local actionYOffset = 80 -- 65
+local actionYOffset = 110 -- 65
 local halfSeparation = math.floor((actionBtnWidth + actionGap) / 2)
 
 -- The "Scan" Button
@@ -136,9 +145,10 @@ end)
 
 -- Checkboxes (left-aligned, stacked)
 local trackInnervateCheck = CreateFrame("CheckButton", "InfusionTrackInnervateCheck", mainUI, "UICheckButtonTemplate")
-trackInnervateCheck:SetPoint("BOTTOMLEFT", mainUI, "BOTTOMLEFT", 11, 40)
+trackInnervateCheck:SetPoint("BOTTOMLEFT", mainUI, "BOTTOMLEFT", 11, 70)
 trackInnervateCheck:SetScript("OnClick", function()
     Infusion.TrackInnervateEnabled = this:GetChecked() and true or false
+    Infusion.SaveOptionPrefs()
     RefreshTrackerWindowsFromSelections()
 end)
 getglobal(trackInnervateCheck:GetName() .. "Text"):SetText("Track Innervate")
@@ -147,25 +157,27 @@ local trackRebirthCheck = CreateFrame("CheckButton", "InfusionTrackRebirthCheck"
 trackRebirthCheck:SetPoint("TOPLEFT", trackInnervateCheck, "BOTTOMLEFT", 0, 4)
 trackRebirthCheck:SetScript("OnClick", function()
     Infusion.TrackRebirthEnabled = this:GetChecked() and true or false
+    Infusion.SaveOptionPrefs()
     RefreshTrackerWindowsFromSelections()
 end)
 getglobal(trackRebirthCheck:GetName() .. "Text"):SetText("Track Rebirth")
 
-trackInnervateCheck:SetChecked(Infusion.TrackInnervateEnabled)
-trackRebirthCheck:SetChecked(Infusion.TrackRebirthEnabled)
+local compactCheck = CreateFrame("CheckButton", "InfusionCompactCheck", mainUI, "UICheckButtonTemplate")
+compactCheck:SetPoint("TOPLEFT", trackRebirthCheck, "BOTTOMLEFT", 0, 4)
+compactCheck:SetScript("OnClick", function()
+    Infusion.CompactEnabled = this:GetChecked() and true or false
+    Infusion.SaveOptionPrefs()
+    RefreshTrackerWindowsFromSelections()
+end)
+getglobal(compactCheck:GetName() .. "Text"):SetText("Compact")
 
--- Gate scan UI by load-time SuperWoW detection variable
-if Infusion.HasSuperWoW then
-    scanBtn:Show()
-    superWoWWarning:Hide()
-    helpBtn:SetPoint("BOTTOM", mainUI, "BOTTOM", halfSeparation, actionYOffset)
-else
-    scanBtn:Hide()
-    superWoWWarning:Show()
-    -- Keep Help available even without SuperWoW.
-    helpBtn:SetPoint("BOTTOM", mainUI, "BOTTOM", 0, actionYOffset)
+function Infusion.SyncMainUIFromPrefs()
+    trackInnervateCheck:SetChecked(Infusion.TrackInnervateEnabled)
+    trackRebirthCheck:SetChecked(Infusion.TrackRebirthEnabled)
+    compactCheck:SetChecked(Infusion.CompactEnabled)
 end
 
+Infusion.SyncMainUIFromPrefs()
 -- Hide the UI by default when the game loads
 mainUI:Hide()
 

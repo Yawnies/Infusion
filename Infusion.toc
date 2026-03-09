@@ -3,8 +3,10 @@
 ## Notes: Are you a priest? Want to track innervates AND annoy your raid druids whenever you need one, but you're not sure which of them has it? Then this addon is for you! Also tracks battle rezzes.
 ## Author: Yawnies
 ## Version: 1.0
+## SavedVariables: INFUSION_PREFS
 
 Core.lua
 MainUI.lua
 TrackerUI.lua
+Commands.lua
 Minimap.lua

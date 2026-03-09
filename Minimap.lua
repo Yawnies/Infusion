@@ -1,3 +1,7 @@
+if not Infusion or Infusion.Disabled then
+    return
+end
+
 -- Create the physical minimap button
 local minimapBtn = CreateFrame("Button", "InfusionMinimapBtn", Minimap)
 minimapBtn:SetWidth(32)

@@ -11,6 +11,13 @@ Infusion.Debug = false
 Infusion.IsTrackingActive = false
 Infusion.TrackInnervateEnabled = true
 Infusion.TrackRebirthEnabled = true
+Infusion.CompactEnabled = false
+
+local DEFAULT_OPTIONS = {
+    track_innervate = true,
+    track_rebirth = true,
+    compact = false,
+}
 
 local INNERVATE_CD = 360
 local REBIRTH_CD = 1800
@@ -30,8 +37,90 @@ local function DebugLog(msg)
     -- end
 end
 
-function Infusion.CheckSuperWoW()
-    -- Turtle WoW clients can expose SuperWoW via addon state and/or globals from the DLL/addon.
+function Infusion.InitPrefs()
+    if type(INFUSION_PREFS) ~= "table" then
+        INFUSION_PREFS = {}
+    end
+
+    if type(INFUSION_PREFS.options) ~= "table" then
+        INFUSION_PREFS.options = {}
+    end
+
+    if type(INFUSION_PREFS.positions) ~= "table" then
+        INFUSION_PREFS.positions = {}
+    end
+end
+
+function Infusion.LoadPrefs()
+    Infusion.InitPrefs()
+
+    local opts = INFUSION_PREFS.options
+    if opts.track_innervate == nil then
+        opts.track_innervate = DEFAULT_OPTIONS.track_innervate
+    end
+
+    if opts.track_rebirth == nil then
+        opts.track_rebirth = DEFAULT_OPTIONS.track_rebirth
+    end
+
+    if opts.compact == nil then
+        opts.compact = DEFAULT_OPTIONS.compact
+    end
+
+    Infusion.TrackInnervateEnabled = opts.track_innervate and true or false
+    Infusion.TrackRebirthEnabled = opts.track_rebirth and true or false
+    Infusion.CompactEnabled = opts.compact and true or false
+end
+
+function Infusion.SaveOptionPrefs()
+    Infusion.InitPrefs()
+
+    INFUSION_PREFS.options.track_innervate = Infusion.TrackInnervateEnabled and true or false
+    INFUSION_PREFS.options.track_rebirth = Infusion.TrackRebirthEnabled and true or false
+    INFUSION_PREFS.options.compact = Infusion.CompactEnabled and true or false
+end
+
+function Infusion.SaveFramePosition(prefKey, frame)
+    if not prefKey or not frame then
+        return
+    end
+
+    Infusion.InitPrefs()
+
+    local point, _, relativePoint, x, y = frame:GetPoint()
+    INFUSION_PREFS.positions[prefKey] = {
+        point = point or "CENTER",
+        relativePoint = relativePoint or point or "CENTER",
+        x = x or 0,
+        y = y or 0,
+    }
+end
+
+function Infusion.RestoreFramePosition(prefKey, frame, defaultPoint, defaultRelativeFrame, defaultRelativePoint, defaultX, defaultY)
+    if not prefKey or not frame then
+        return
+    end
+
+    Infusion.InitPrefs()
+
+    local pos = INFUSION_PREFS.positions[prefKey]
+    frame:ClearAllPoints()
+
+    if pos and pos.point and pos.relativePoint and pos.x and pos.y then
+        frame:SetPoint(pos.point, UIParent, pos.relativePoint, pos.x, pos.y)
+        return
+    end
+
+    frame:SetPoint(
+        defaultPoint or "CENTER",
+        defaultRelativeFrame or UIParent,
+        defaultRelativePoint or defaultPoint or "CENTER",
+        defaultX or 0,
+        defaultY or 0
+    )
+end
+
+local function IsSuperWoWReady()
     if IsAddOnLoaded and (IsAddOnLoaded("SuperWoW") or IsAddOnLoaded("SuperWOW")) then
         return true
     end
@@ -52,30 +141,32 @@ function Infusion.CheckSuperWoW()
     return false
 end
 
+if not IsSuperWoWReady() then
+    Infusion.Disabled = true
+
+    StaticPopupDialogs["INFUSION_NO_SUPERWOW"] = {
+        text = "SuperWoW is required to run Infusion. Please install it before reloading the addon.",
+        button1 = OKAY,
+        timeout = 0,
+        whileDead = 1,
+        hideOnEscape = 1,
+        showAlert = 1,
+    }
+
+    StaticPopup_Show("INFUSION_NO_SUPERWOW")
+    return
+end
+
+Infusion.HasSuperWoW = true
+
 function Infusion.RefreshTrackingState()
     local inRaid = GetNumRaidMembers() > 0
     local hasTrackedDruid = next(Infusion.scannedDruids) ~= nil
     local hasEnabledTracking = Infusion.TrackInnervateEnabled or Infusion.TrackRebirthEnabled
-    local shouldTrack = Infusion.HasSuperWoW and inRaid and hasTrackedDruid and hasEnabledTracking
+    local shouldTrack = inRaid and hasTrackedDruid and hasEnabledTracking
 
-    if Infusion.IsTrackingActive ~= shouldTrack then
-        Infusion.IsTrackingActive = shouldTrack
-        --[[ DebugLog(
-            "Tracking active=" .. tostring(Infusion.IsTrackingActive) ..
-            " (inRaid=" .. tostring(inRaid) ..
-            ", scannedDruids=" .. tostring(hasTrackedDruid) ..
-            ", trackInnervate=" .. tostring(Infusion.TrackInnervateEnabled) ..
-            ", trackRebirth=" .. tostring(Infusion.TrackRebirthEnabled) ..
-            ", superWoW=" .. tostring(Infusion.HasSuperWoW) .. ")"
-        )
-            ]]--
-    else
-        Infusion.IsTrackingActive = shouldTrack
-    end
+    Infusion.IsTrackingActive = shouldTrack
 end
-
--- Checked once when addon loads; UI uses this to gate raid scanning.
-Infusion.HasSuperWoW = Infusion.CheckSuperWoW()
 
 --[[
 SLASH_INFUSIONDEBUG1 = "/infusiondebug"
@@ -105,12 +196,6 @@ function Infusion.ScanRaid()
         return
     end
 
-    if not Infusion.HasSuperWoW then
-        DEFAULT_CHAT_FRAME:AddMessage("Infusion: SuperWoW is required to scan your raid!", 1.0, 0.2, 0.2)
-        Infusion.RefreshTrackingState()
-        return
-    end
-
     local numRaid = GetNumRaidMembers()
 
     -- Abort if not in a raid
@@ -120,11 +205,13 @@ function Infusion.ScanRaid()
         return
     end
 
+    -- Persist checkbox options when scanning.
+    Infusion.SaveOptionPrefs()
+
     -- Clear lists and repopulate them
     Infusion.scannedDruids = {}
     Infusion.druids = {}
     Infusion.rebirths = {}
-    -- DebugLog("Scan started. Raid members=" .. numRaid)
 
     for i = 1, numRaid do
         local name, _, _, _, _, fileName = GetRaidRosterInfo(i)
@@ -136,7 +223,6 @@ function Infusion.ScanRaid()
             if Infusion.TrackRebirthEnabled then
                 Infusion.rebirths[name] = 0
             end
-            -- DebugLog("Tracked druid: " .. name)
         end
     end
 
@@ -177,15 +263,6 @@ local function HandleUnitCastEvent()
     local castEventType = arg3
     local spellID = tonumber(arg4)
 
-    if Infusion.Debug then
-        --[[ DebugLog(
-            "UNIT_CASTEVENT casterGUID=" .. tostring(casterGUID) ..
-            " type=" .. tostring(castEventType) ..
-            " spellID=" .. tostring(spellID)
-        )
-            ]]--
-    end
-
     -- Use CAST to avoid duplicate START/CAST triggers on some abilities.
     if castEventType ~= "CAST" then
         return
@@ -208,17 +285,13 @@ local function HandleUnitCastEvent()
 
     local casterName = GetRaidNameByGUID(casterGUID)
     if not casterName then
-        -- DebugLog("Tracked cast detected, but caster GUID was not found in raid roster.")
         return
     end
 
     if isInnervateCast then
         if Infusion.druids[casterName] ~= nil then
             Infusion.druids[casterName] = INNERVATE_CD
-            -- DebugLog("Innervate cooldown set via UNIT_CASTEVENT: " .. casterName .. " => " .. INNERVATE_CD .. "s")
             Infusion.UpdateTrackerDisplay()
-        else
-            -- DebugLog("Innervate caster resolved, but not in scanned druid list: " .. casterName)
         end
         return
     end
@@ -226,16 +299,14 @@ local function HandleUnitCastEvent()
     if isRebirthCast then
         if Infusion.rebirths[casterName] ~= nil then
             Infusion.rebirths[casterName] = REBIRTH_CD
-            -- DebugLog("Rebirth cooldown set via UNIT_CASTEVENT: " .. casterName .. " => " .. REBIRTH_CD .. "s")
             Infusion.UpdateRebirthTrackerDisplay()
-        else
-            -- DebugLog("Rebirth caster resolved, but not in scanned druid list: " .. casterName)
         end
     end
 end
 
 -- 2. Combat Log Listener & Timer Loop
 local coreFrame = CreateFrame("Frame")
+coreFrame:RegisterEvent("ADDON_LOADED")
 coreFrame:RegisterEvent("UNIT_CASTEVENT")
 coreFrame:RegisterEvent("CHAT_MSG_SPELL_SELF_BUFF")
 coreFrame:RegisterEvent("CHAT_MSG_SPELL_PARTY_BUFF")
@@ -247,7 +318,19 @@ coreFrame:RegisterEvent("RAID_ROSTER_UPDATE")
 coreFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 
 coreFrame:SetScript("OnEvent", function()
+    if event == "ADDON_LOADED" and arg1 == "Infusion" then
+        Infusion.LoadPrefs()
+        if Infusion.SyncMainUIFromPrefs then
+            Infusion.SyncMainUIFromPrefs()
+        end
+        Infusion.RefreshTrackingState()
+        return
+    end
+
     if event == "RAID_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
+        if GetNumRaidMembers() == 0 and Infusion.CloseTrackers then
+            Infusion.CloseTrackers()
+        end
         Infusion.RefreshTrackingState()
         return
     end
@@ -266,33 +349,24 @@ coreFrame:SetScript("OnEvent", function()
         return
     end
 
-    if not arg1 then return end
-
-    if Infusion.Debug and (string.find(arg1, "Innervate") or string.find(arg1, "innervate")) then
-        -- DebugLog("Event=" .. tostring(event) .. " Msg='" .. arg1 .. "'")
+    if not arg1 then
+        return
     end
 
     -- Fallback path for Innervate if UNIT_CASTEVENT is unavailable.
     local caster
     if string.find(arg1, "^You gain Innervate") then
         caster = UnitName("player")
-        -- DebugLog("Matched self Innervate (fallback). Caster=" .. tostring(caster))
     end
 
     if not caster then
         local _, _, gainCaster = string.find(arg1, "^(.-) gains Innervate")
         caster = gainCaster
-        if caster then
-            -- DebugLog("Matched Innervate gain (fallback). Caster=" .. caster)
-        end
     end
 
     if caster and Infusion.druids[caster] ~= nil then
         Infusion.druids[caster] = INNERVATE_CD
-        -- DebugLog("Innervate cooldown set (fallback): " .. caster .. " => " .. INNERVATE_CD .. "s")
         Infusion.UpdateTrackerDisplay()
-    elseif caster then
-        -- DebugLog("Innervate caster not tracked (not in scanned druid list): " .. caster)
     end
 end)
 
@@ -310,16 +384,10 @@ coreFrame:SetScript("OnUpdate", function()
     if Infusion.TrackInnervateEnabled then
         for name, cd in pairs(Infusion.druids) do
             if cd > 0 then
-                local previous = cd
                 Infusion.druids[name] = cd - elapsed
 
                 if Infusion.druids[name] <= 0 then
                     Infusion.druids[name] = 0
-                    -- DebugLog("Innervate cooldown finished: " .. name)
-                end
-
-                if math.floor(previous) ~= math.floor(Infusion.druids[name]) then
-                    -- DebugLog("Innervate tick " .. name .. " => " .. string.format("%.1f", Infusion.druids[name]))
                 end
 
                 needsInnervateUIUpdate = true
@@ -330,16 +398,10 @@ coreFrame:SetScript("OnUpdate", function()
     if Infusion.TrackRebirthEnabled then
         for name, cd in pairs(Infusion.rebirths) do
             if cd > 0 then
-                local previous = cd
                 Infusion.rebirths[name] = cd - elapsed
 
                 if Infusion.rebirths[name] <= 0 then
                     Infusion.rebirths[name] = 0
-                    -- DebugLog("Rebirth cooldown finished: " .. name)
-                end
-
-                if math.floor(previous) ~= math.floor(Infusion.rebirths[name]) then
-                    -- DebugLog("Rebirth tick " .. name .. " => " .. string.format("%.1f", Infusion.rebirths[name]))
                 end
 
                 needsRebirthUIUpdate = true
