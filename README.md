@@ -1,5 +1,6 @@
 # Infusion
-This addon allows you to track the cooldowns of two specific druid spells: Innervate and Rebirth (commonly known as brez/battle rez/etc). Whenever someone in your raid uses them, it'll display their cooldowns for these spells so that you can work your gameplay around their availability, as well as requesting them with a simple click on your ~mana slave~ druid of choice during boss/trash segments where you run out of mana often.  
+This addon allows you to track the cooldowns of two specific druid spells: Innervate and Rebirth (commonly known as brez/battle rez/etc). Whenever a druid in your raid uses them, it'll display their cooldowns so that you can work your gameplay around their availability, as well as requesting them with a simple click on your ~mana slave~ druid of choice during boss/trash segments where you run out of mana often.  
+  
 Particularly useful for priests due to their high mana costs and for raid leaders looking to track these cooldowns for ease of callouts.  
   
 **INFUSION REQUIRES SUPERWOW TO WORK!**
