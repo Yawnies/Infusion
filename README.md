@@ -10,7 +10,7 @@ To access the menu, click the innervate button on your minimap wheel, or type `/
 ![Menu](https://files.catbox.moe/dfatbq.png)  
   
 The **Scan** button will scan the raid for all the druids, then display the tracking widgets you have selected (for tracking innervates, brez, or both at once) if there are any in the raid. The **Help** button displays the available commands.  
-Clicking any of the druid names in the widgets will automatically whisper them requesting an Innervate for you. (Innervate only, does not work on the Rebirth widget)  
+**Clicking** any of the druid names in the widgets will automatically whisper them requesting an Innervate for you. (Innervate only, does not work on the Rebirth widget)  
   
 ![TrackersBig](https://files.catbox.moe/2p0plb.png) ![TrackersSmol](https://files.catbox.moe/185uiy.png)  
   
