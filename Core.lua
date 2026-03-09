@@ -6,8 +6,6 @@ Infusion = {}
 Infusion.scannedDruids = {} -- Shared druid roster from last scan
 Infusion.druids = {} -- Innervate cooldowns by druid name
 Infusion.rebirths = {} -- Rebirth cooldowns by druid name
--- Infusion.Debug = true
-Infusion.Debug = false
 Infusion.IsTrackingActive = false
 Infusion.TrackInnervateEnabled = true
 Infusion.TrackRebirthEnabled = true
@@ -29,13 +27,6 @@ local REBIRTH_SPELL_IDS = {
     [20747] = true, -- Rebirth Rank 4
     [20748] = true, -- Rebirth Rank 5
 }
-
-local function DebugLog(msg)
-    -- DEBUG DISABLED FOR LIVE TESTING
-    -- if Infusion.Debug then
-    --     DEFAULT_CHAT_FRAME:AddMessage("Infusion DEBUG: " .. msg, 0.4, 0.8, 1.0)
-    -- end
-end
 
 function Infusion.InitPrefs()
     if type(INFUSION_PREFS) ~= "table" then
@@ -168,25 +159,6 @@ function Infusion.RefreshTrackingState()
     Infusion.IsTrackingActive = shouldTrack
 end
 
---[[
-SLASH_INFUSIONDEBUG1 = "/infusiondebug"
-SlashCmdList["INFUSIONDEBUG"] = function(msg)
-    if msg == "0" or msg == "off" then
-        Infusion.Debug = false
-    elseif msg == "1" or msg == "on" then
-        Infusion.Debug = true
-    else
-        Infusion.Debug = not Infusion.Debug
-    end
-
-    DEFAULT_CHAT_FRAME:AddMessage("Infusion: Debug " .. (Infusion.Debug and "ON" or "OFF"), 1.0, 1.0, 0.0)
-end
-
-if Infusion.Debug then
-    -- DebugLog("SuperWoW detected=" .. tostring(Infusion.HasSuperWoW))
-end
-]]
-
 Infusion.RefreshTrackingState()
 
 -- 1. The Scanner Logic
@@ -267,7 +239,6 @@ local function HandleUnitCastEvent()
     if castEventType ~= "CAST" then
         return
     end
-
     local isInnervateCast = (spellID == INNERVATE_SPELL_ID)
     local isRebirthCast = (spellID and REBIRTH_SPELL_IDS[spellID])
 
@@ -308,12 +279,6 @@ end
 local coreFrame = CreateFrame("Frame")
 coreFrame:RegisterEvent("ADDON_LOADED")
 coreFrame:RegisterEvent("UNIT_CASTEVENT")
-coreFrame:RegisterEvent("CHAT_MSG_SPELL_SELF_BUFF")
-coreFrame:RegisterEvent("CHAT_MSG_SPELL_PARTY_BUFF")
-coreFrame:RegisterEvent("CHAT_MSG_SPELL_FRIENDLYPLAYER_BUFF")
-coreFrame:RegisterEvent("CHAT_MSG_SPELL_PERIODIC_SELF_BUFFS")
-coreFrame:RegisterEvent("CHAT_MSG_SPELL_PERIODIC_PARTY_BUFFS")
-coreFrame:RegisterEvent("CHAT_MSG_SPELL_PERIODIC_FRIENDLYPLAYER_BUFFS")
 coreFrame:RegisterEvent("RAID_ROSTER_UPDATE")
 coreFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
 
@@ -340,34 +305,7 @@ coreFrame:SetScript("OnEvent", function()
         return
     end
 
-    if not Infusion.IsTrackingActive then
-        return
-    end
 
-    -- Innervate fallback parsing only matters if innervate tracking is enabled.
-    if not Infusion.TrackInnervateEnabled then
-        return
-    end
-
-    if not arg1 then
-        return
-    end
-
-    -- Fallback path for Innervate if UNIT_CASTEVENT is unavailable.
-    local caster
-    if string.find(arg1, "^You gain Innervate") then
-        caster = UnitName("player")
-    end
-
-    if not caster then
-        local _, _, gainCaster = string.find(arg1, "^(.-) gains Innervate")
-        caster = gainCaster
-    end
-
-    if caster and Infusion.druids[caster] ~= nil then
-        Infusion.druids[caster] = INNERVATE_CD
-        Infusion.UpdateTrackerDisplay()
-    end
 end)
 
 -- The OnUpdate function runs every visual frame.
