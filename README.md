@@ -28,3 +28,6 @@ Above is a comparison between the default and the 'Compact' widgets. Both have t
 Welcome contributions of any kind, particularly those related to optimization. This was coded using Codex magic and a healthy dose of reviewing, but I'm nowhere near an expert in archaic 2004 Lua and can only do so much. If you read through and spot silly things that could be improved, let me know!  
 
 Special thanks to **Hiromi** for helping test so much of this addon! Honorable mentions to all the druids in the pics as well that gave me innervates every time I whispered them xD.
+## To-do
+* add autoscan (join raid > autoscan > (no druids, display empty box) > refresh scan on join/leave)
+* bigwigs integration for resyncing in case of dc
