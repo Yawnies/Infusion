@@ -204,10 +204,13 @@ end
 
 Infusion.ResetToPlaceholderState(true)
 
+local BuildRosterSignature
+
 local function PerformRaidScan(preserveCooldowns)
     local numRaid = GetNumRaidMembers()
     if numRaid == 0 then
         Infusion.ResetToPlaceholderState(true)
+        lastRosterSignature = BuildRosterSignature()
         Infusion.BuildTracker()
         Infusion.BuildRebirthTracker()
         return
@@ -254,6 +257,7 @@ local function PerformRaidScan(preserveCooldowns)
     end
 
     Infusion.RefreshTrackingState()
+    lastRosterSignature = BuildRosterSignature()
     Infusion.BuildTracker()
     Infusion.BuildRebirthTracker()
 end
@@ -269,10 +273,53 @@ function Infusion.ScanRaid()
     PerformRaidScan(true)
 end
 
+BuildRosterSignature = function()
+    local numRaid = GetNumRaidMembers()
+    if numRaid == 0 then
+        return ""
+    end
+
+    local members = {}
+    for i = 1, numRaid do
+        local unit = "raid" .. i
+        local exists, guid = UnitExists(unit)
+        local name = UnitName(unit)
+
+        if exists then
+            table.insert(members, (guid and guid ~= "") and guid or (name or ("unknown:" .. i)))
+        end
+    end
+
+    table.sort(members)
+    return table.concat(members, "|")
+end
+
 local function RequestAutoScan(force)
     local now = GetTime()
     if not force and (now - lastAutoScanTime) < AUTO_SCAN_MIN_INTERVAL then
+        if DEFAULT_CHAT_FRAME then
+            DEFAULT_CHAT_FRAME:AddMessage("Infusion DEBUG ROSTER: scan denied (throttled).", 0.4, 0.8, 1.0)
+        end
         return
+    end
+
+    local previousSignature = lastRosterSignature or ""
+    local currentSignature = BuildRosterSignature() or ""
+
+    if DEFAULT_CHAT_FRAME then
+        DEFAULT_CHAT_FRAME:AddMessage("Infusion DEBUG ROSTER: current signature = " .. previousSignature, 0.4, 0.8, 1.0)
+        DEFAULT_CHAT_FRAME:AddMessage("Infusion DEBUG ROSTER: remade signature = " .. currentSignature, 0.4, 0.8, 1.0)
+    end
+
+    if not force and currentSignature == previousSignature then
+        if DEFAULT_CHAT_FRAME then
+            DEFAULT_CHAT_FRAME:AddMessage("Infusion DEBUG ROSTER: scan denied (signatures match).", 0.4, 0.8, 1.0)
+        end
+        return
+    end
+
+    if DEFAULT_CHAT_FRAME then
+        DEFAULT_CHAT_FRAME:AddMessage("Infusion DEBUG ROSTER: scan accepted (signatures differ).", 0.4, 0.8, 1.0)
     end
 
     lastAutoScanTime = now
@@ -377,6 +424,10 @@ coreFrame:SetScript("OnEvent", function()
     end
 
     if event == "RAID_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
+        if event == "RAID_ROSTER_UPDATE" and DEFAULT_CHAT_FRAME then
+            DEFAULT_CHAT_FRAME:AddMessage("Infusion DEBUG ROSTER: RAID_ROSTER_UPDATE fired.", 0.4, 0.8, 1.0)
+        end
+
         local inRaid = GetNumRaidMembers() > 0
 
         if not inRaid and Infusion.CloseTrackers then
