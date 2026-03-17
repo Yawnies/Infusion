@@ -10,6 +10,8 @@ Infusion.IsTrackingActive = false
 Infusion.TrackInnervateEnabled = true
 Infusion.TrackRebirthEnabled = true
 Infusion.CompactEnabled = false
+Infusion.NoDruidInRaid = false
+Infusion.MOCK_DRUID_NAME = "NO DRUID IN RAID"
 
 local DEFAULT_OPTIONS = {
     track_innervate = true,
@@ -27,6 +29,9 @@ local REBIRTH_SPELL_IDS = {
     [20747] = true, -- Rebirth Rank 4
     [20748] = true, -- Rebirth Rank 5
 }
+
+local AUTO_SCAN_MIN_INTERVAL = 1.0
+local lastAutoScanTime = 0
 
 function Infusion.InitPrefs()
     if type(INFUSION_PREFS) ~= "table" then
@@ -152,61 +157,126 @@ Infusion.HasSuperWoW = true
 
 function Infusion.RefreshTrackingState()
     local inRaid = GetNumRaidMembers() > 0
-    local hasTrackedDruid = next(Infusion.scannedDruids) ~= nil
+    local hasRealDruid = (next(Infusion.scannedDruids) ~= nil) and (not Infusion.NoDruidInRaid)
     local hasEnabledTracking = Infusion.TrackInnervateEnabled or Infusion.TrackRebirthEnabled
-    local shouldTrack = inRaid and hasTrackedDruid and hasEnabledTracking
+    local shouldTrack = inRaid and hasRealDruid and hasEnabledTracking
 
     Infusion.IsTrackingActive = shouldTrack
 end
 
-Infusion.RefreshTrackingState()
-
--- 1. The Scanner Logic
-function Infusion.ScanRaid()
-    if not Infusion.TrackInnervateEnabled and not Infusion.TrackRebirthEnabled then
-        DEFAULT_CHAT_FRAME:AddMessage("Infusion: You must select at least one option before scanning!", 1.0, 0.2, 0.2)
+function Infusion.EnsurePlaceholderDruid(forceBoth)
+    if next(Infusion.scannedDruids) ~= nil then
         return
     end
 
-    local numRaid = GetNumRaidMembers()
+    local mockName = Infusion.MOCK_DRUID_NAME
+    Infusion.NoDruidInRaid = true
+    Infusion.scannedDruids[mockName] = true
 
-    -- Abort if not in a raid
-    if numRaid == 0 then
-        DEFAULT_CHAT_FRAME:AddMessage("Infusion: Must be in a raid group for the scanner to work!", 1.0, 0.0, 0.0)
-        Infusion.RefreshTrackingState()
-        return
+    if forceBoth or Infusion.TrackInnervateEnabled then
+        Infusion.druids[mockName] = 0
     end
 
-    -- Persist checkbox options when scanning.
-    Infusion.SaveOptionPrefs()
+    if forceBoth or Infusion.TrackRebirthEnabled then
+        Infusion.rebirths[mockName] = 0
+    end
+end
 
-    -- Clear lists and repopulate them
+function Infusion.ResetToPlaceholderState(forceBoth)
     Infusion.scannedDruids = {}
     Infusion.druids = {}
     Infusion.rebirths = {}
+    Infusion.EnsurePlaceholderDruid(forceBoth)
+    Infusion.RefreshTrackingState()
+end
+
+function Infusion.ShowWidgetConfig()
+    Infusion.ResetToPlaceholderState(true)
+
+    if Infusion.BuildTracker then
+        Infusion.BuildTracker(true)
+    end
+
+    if Infusion.BuildRebirthTracker then
+        Infusion.BuildRebirthTracker(true)
+    end
+end
+
+Infusion.ResetToPlaceholderState(true)
+
+local function PerformRaidScan(preserveCooldowns)
+    local numRaid = GetNumRaidMembers()
+    if numRaid == 0 then
+        Infusion.ResetToPlaceholderState(true)
+        Infusion.BuildTracker()
+        Infusion.BuildRebirthTracker()
+        return
+    end
+
+    local oldInnervates = Infusion.druids
+    local oldRebirths = Infusion.rebirths
+
+    local newScannedDruids = {}
+    local newInnervates = {}
+    local newRebirths = {}
 
     for i = 1, numRaid do
         local name, _, _, _, _, fileName = GetRaidRosterInfo(i)
         if name and fileName == "DRUID" then
-            Infusion.scannedDruids[name] = true
+            newScannedDruids[name] = true
+
             if Infusion.TrackInnervateEnabled then
-                Infusion.druids[name] = 0
+                if preserveCooldowns and oldInnervates[name] ~= nil then
+                    newInnervates[name] = oldInnervates[name]
+                else
+                    newInnervates[name] = 0
+                end
             end
+
             if Infusion.TrackRebirthEnabled then
-                Infusion.rebirths[name] = 0
+                if preserveCooldowns and oldRebirths[name] ~= nil then
+                    newRebirths[name] = oldRebirths[name]
+                else
+                    newRebirths[name] = 0
+                end
             end
         end
     end
 
+    Infusion.scannedDruids = newScannedDruids
+    Infusion.druids = newInnervates
+    Infusion.rebirths = newRebirths
+
     if next(Infusion.scannedDruids) == nil then
-        DEFAULT_CHAT_FRAME:AddMessage("Infusion: No Druids found in the raid.", 1.0, 0.0, 0.0)
+        Infusion.EnsurePlaceholderDruid(false)
+    else
+        Infusion.NoDruidInRaid = false
     end
 
     Infusion.RefreshTrackingState()
-
-    -- Build/refresh trackers according to selected options
     Infusion.BuildTracker()
     Infusion.BuildRebirthTracker()
+end
+
+function Infusion.ScanRaid()
+    if not Infusion.TrackInnervateEnabled and not Infusion.TrackRebirthEnabled then
+        Infusion.RefreshTrackingState()
+        Infusion.BuildTracker()
+        Infusion.BuildRebirthTracker()
+        return
+    end
+
+    PerformRaidScan(true)
+end
+
+local function RequestAutoScan(force)
+    local now = GetTime()
+    if not force and (now - lastAutoScanTime) < AUTO_SCAN_MIN_INTERVAL then
+        return
+    end
+
+    lastAutoScanTime = now
+    Infusion.ScanRaid()
 end
 
 local function GetRaidNameByGUID(casterGUID)
@@ -239,6 +309,11 @@ local function HandleUnitCastEvent()
     if castEventType ~= "CAST" then
         return
     end
+
+    --if DEFAULT_CHAT_FRAME then
+        -- DEFAULT_CHAT_FRAME:AddMessage("Infusion DEBUG CAST: casterGUID=" .. tostring(casterGUID) .. " spellID=" .. tostring(spellID), 0.4, 0.8, 1.0)
+    --end
+
     local isInnervateCast = (spellID == INNERVATE_SPELL_ID)
     local isRebirthCast = (spellID and REBIRTH_SPELL_IDS[spellID])
 
@@ -288,15 +363,28 @@ coreFrame:SetScript("OnEvent", function()
         if Infusion.SyncMainUIFromPrefs then
             Infusion.SyncMainUIFromPrefs()
         end
-        Infusion.RefreshTrackingState()
+
+        if next(Infusion.scannedDruids) == nil then
+            Infusion.EnsurePlaceholderDruid(true)
+        end
+
+        if GetNumRaidMembers() > 0 then
+            RequestAutoScan(true)
+        else
+            Infusion.RefreshTrackingState()
+        end
         return
     end
 
     if event == "RAID_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" then
-        if GetNumRaidMembers() == 0 and Infusion.CloseTrackers then
+        local inRaid = GetNumRaidMembers() > 0
+
+        if not inRaid and Infusion.CloseTrackers then
             Infusion.CloseTrackers()
+            return
         end
-        Infusion.RefreshTrackingState()
+
+        RequestAutoScan(false)
         return
     end
 
@@ -304,8 +392,6 @@ coreFrame:SetScript("OnEvent", function()
         HandleUnitCastEvent()
         return
     end
-
-
 end)
 
 -- The OnUpdate function runs every visual frame.

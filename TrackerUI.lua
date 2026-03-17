@@ -74,6 +74,10 @@ local function IsCompact()
     return Infusion.CompactEnabled and true or false
 end
 
+local function IsMockDruid(name)
+    return name and Infusion and Infusion.MOCK_DRUID_NAME and name == Infusion.MOCK_DRUID_NAME
+end
+
 local function ApplyFrameStyle(frame)
     local compact = IsCompact()
     local inset = compact and 0 or 4
@@ -179,6 +183,10 @@ local function EnsureInnervateRow(i)
             return
         end
 
+        if IsMockDruid(rowParent.druidName) then
+            return
+        end
+
         local cd = Infusion.druids[rowParent.druidName]
         if cd and cd <= 0 then
             WhisperInnervateRequest(rowParent.druidName)
@@ -244,11 +252,11 @@ local function ApplyRowLayout(row, layout)
 end
 
 -- Called by Core.lua when Scan is clicked
-function Infusion.BuildTracker()
+function Infusion.BuildTracker(forceShow)
     ApplyFrameStyle(innervateTrackerFrame)
 
     local druidCount, sortedNames = GetSortedDruids()
-    if not Infusion.TrackInnervateEnabled or druidCount == 0 then
+    if ((not Infusion.TrackInnervateEnabled) and (not forceShow)) or druidCount == 0 then
         innervateTrackerFrame:Hide()
         return
     end
@@ -283,19 +291,28 @@ function Infusion.BuildTracker()
         row:ClearAllPoints()
         row:SetPoint("TOP", innervateTrackerFrame, "TOP", 0, -layout.topPadding - ((i - 1) * layout.rowStep))
         row.nameText:SetText(name)
+        if IsMockDruid(name) then
+            row.nameText:SetTextColor(1.0, 0.2, 0.2)
+            row.nameText:SetWidth(layout.rowWidth - layout.leftPad - layout.rightPad - 16 - layout.nameGap)
+            row.cdText:SetWidth(0)
+        else
+            row.nameText:SetTextColor(1.0, 0.82, 0.0)
+            row.nameText:SetWidth(layout.nameWidth)
+            row.cdText:SetWidth(layout.cdWidth)
+        end
         row.druidName = name
         row:Show()
     end
 
-    Infusion.UpdateTrackerDisplay()
+    Infusion.UpdateTrackerDisplay(forceShow)
 end
 
 -- Called by Core.lua when Scan is clicked (separate frame for Rebirth)
-function Infusion.BuildRebirthTracker()
+function Infusion.BuildRebirthTracker(forceShow)
     ApplyFrameStyle(rebirthTrackerFrame)
 
     local druidCount, sortedNames = GetSortedDruids()
-    if not Infusion.TrackRebirthEnabled or druidCount == 0 then
+    if ((not Infusion.TrackRebirthEnabled) and (not forceShow)) or druidCount == 0 then
         rebirthTrackerFrame:Hide()
         return
     end
@@ -324,16 +341,25 @@ function Infusion.BuildRebirthTracker()
         row:ClearAllPoints()
         row:SetPoint("TOP", rebirthTrackerFrame, "TOP", 0, -layout.topPadding - ((i - 1) * layout.rowStep))
         row.nameText:SetText(name)
+        if IsMockDruid(name) then
+            row.nameText:SetTextColor(1.0, 0.2, 0.2)
+            row.nameText:SetWidth(layout.rowWidth - layout.leftPad - layout.rightPad - 16 - layout.nameGap)
+            row.cdText:SetWidth(0)
+        else
+            row.nameText:SetTextColor(1.0, 0.82, 0.0)
+            row.nameText:SetWidth(layout.nameWidth)
+            row.cdText:SetWidth(layout.cdWidth)
+        end
         row.druidName = name
         row:Show()
     end
 
-    Infusion.UpdateRebirthTrackerDisplay()
+    Infusion.UpdateRebirthTrackerDisplay(forceShow)
 end
 
 -- Called by the OnUpdate loop in Core.lua to refresh innervate tracker
-function Infusion.UpdateTrackerDisplay()
-    if not Infusion.TrackInnervateEnabled then
+function Infusion.UpdateTrackerDisplay(forceShow)
+    if not Infusion.TrackInnervateEnabled and not forceShow then
         innervateTrackerFrame:Hide()
         return
     end
@@ -342,22 +368,33 @@ function Infusion.UpdateTrackerDisplay()
 
     for _, row in ipairs(innervateRows) do
         if row:IsVisible() and row.druidName then
-            local cd = Infusion.druids[row.druidName]
-            if cd and cd > 0 then
-                row:SetAlpha(0.4)
-                row.cdText:SetText(math.ceil(cd) .. "s")
-                row.cdText:SetTextColor(1.0, 0.0, 0.0)
+            if IsMockDruid(row.druidName) then
+                row:SetAlpha(1.0)
+                row.nameText:SetTextColor(1.0, 0.2, 0.2)
+                row.cdText:SetText("")
                 if row.requestOverlay then
                     row.requestOverlay:Hide()
                     row.requestOverlay:EnableMouse(false)
                 end
             else
-                row:SetAlpha(1.0)
-                row.cdText:SetText(readyText)
-                row.cdText:SetTextColor(0.0, 1.0, 0.0)
-                if row.requestOverlay then
-                    row.requestOverlay:Show()
-                    row.requestOverlay:EnableMouse(true)
+                local cd = Infusion.druids[row.druidName]
+                row.nameText:SetTextColor(1.0, 0.82, 0.0)
+                if cd and cd > 0 then
+                    row:SetAlpha(0.4)
+                    row.cdText:SetText(math.ceil(cd) .. "s")
+                    row.cdText:SetTextColor(1.0, 0.0, 0.0)
+                    if row.requestOverlay then
+                        row.requestOverlay:Hide()
+                        row.requestOverlay:EnableMouse(false)
+                    end
+                else
+                    row:SetAlpha(1.0)
+                    row.cdText:SetText(readyText)
+                    row.cdText:SetTextColor(0.0, 1.0, 0.0)
+                    if row.requestOverlay then
+                        row.requestOverlay:Show()
+                        row.requestOverlay:EnableMouse(true)
+                    end
                 end
             end
         end
@@ -365,8 +402,8 @@ function Infusion.UpdateTrackerDisplay()
 end
 
 -- Called by the OnUpdate loop in Core.lua to refresh rebirth tracker
-function Infusion.UpdateRebirthTrackerDisplay()
-    if not Infusion.TrackRebirthEnabled then
+function Infusion.UpdateRebirthTrackerDisplay(forceShow)
+    if not Infusion.TrackRebirthEnabled and not forceShow then
         rebirthTrackerFrame:Hide()
         return
     end
@@ -375,19 +412,27 @@ function Infusion.UpdateRebirthTrackerDisplay()
 
     for _, row in ipairs(rebirthRows) do
         if row:IsVisible() and row.druidName then
-            local cd = Infusion.rebirths[row.druidName]
-            if cd and cd > 0 then
-                row:SetAlpha(0.4)
-                row.cdText:SetText(math.ceil(cd) .. "s")
-                row.cdText:SetTextColor(1.0, 0.0, 0.0)
-            else
+            if IsMockDruid(row.druidName) then
                 row:SetAlpha(1.0)
-                row.cdText:SetText(readyText)
-                row.cdText:SetTextColor(0.0, 1.0, 0.0)
+                row.nameText:SetTextColor(1.0, 0.2, 0.2)
+                row.cdText:SetText("")
+            else
+                local cd = Infusion.rebirths[row.druidName]
+                row.nameText:SetTextColor(1.0, 0.82, 0.0)
+                if cd and cd > 0 then
+                    row:SetAlpha(0.4)
+                    row.cdText:SetText(math.ceil(cd) .. "s")
+                    row.cdText:SetTextColor(1.0, 0.0, 0.0)
+                else
+                    row:SetAlpha(1.0)
+                    row.cdText:SetText(readyText)
+                    row.cdText:SetTextColor(0.0, 1.0, 0.0)
+                end
             end
         end
     end
 end
+
 function Infusion.AreTrackersVisible()
     return (innervateTrackerFrame and innervateTrackerFrame:IsVisible())
         or (rebirthTrackerFrame and rebirthTrackerFrame:IsVisible())
@@ -404,13 +449,18 @@ function Infusion.CloseTrackers()
         rebirthTrackerFrame:Hide()
     end
 
-    -- Closing trackers also clears scan data so stale rows cannot be reused.
-    Infusion.scannedDruids = {}
-    Infusion.druids = {}
-    Infusion.rebirths = {}
+    -- Closing trackers also resets to placeholder so config mode can always display.
+    if Infusion.ResetToPlaceholderState then
+        Infusion.ResetToPlaceholderState(true)
+    else
+        Infusion.scannedDruids = {}
+        Infusion.druids = {}
+        Infusion.rebirths = {}
+        Infusion.NoDruidInRaid = false
 
-    if Infusion.RefreshTrackingState then
-        Infusion.RefreshTrackingState()
+        if Infusion.RefreshTrackingState then
+            Infusion.RefreshTrackingState()
+        end
     end
 
     return wasVisible

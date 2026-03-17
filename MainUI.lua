@@ -5,7 +5,7 @@ end
 -- Create the Main UI Frame
 local mainUI = CreateFrame("Frame", "InfusionMainFrame", UIParent)
 mainUI:SetWidth(150)
-mainUI:SetHeight(270) -- 220 + 50 for Compact checkbox
+mainUI:SetHeight(270) -- 220 + 50 for Compact checkbox, 270, 320
 
 -- Black transparent background (no Blizzard border)
 mainUI:SetBackdrop({
@@ -78,8 +78,8 @@ local function PrintHelp()
 
     DEFAULT_CHAT_FRAME:AddMessage("--- " .. neonGreen .. "Infusion Help" .. reset .. " ---")
     DEFAULT_CHAT_FRAME:AddMessage(neonGreen .. "/infusion" .. reset .. " - opens the Scan/Help window.")
-    DEFAULT_CHAT_FRAME:AddMessage(neonGreen .. "/infusionscan" .. reset .. " or " .. neonGreen .. "/infs" .. reset .. " - scan the raid without having to click Scan (will use the saved attributes from that screen). Will automatically display the tracker(s).")
-    DEFAULT_CHAT_FRAME:AddMessage(neonGreen .. "/infusionclose" .. reset .. " or " .. neonGreen .. "/infc" .. reset .. " - closes the tracking window. Scan to have it appear again.")
+    DEFAULT_CHAT_FRAME:AddMessage(neonGreen .. "/infusionclose" .. reset .. " or " .. neonGreen .. "/infc" .. reset .. " - closes the tracking window. It will re-open on the next autoscan.")
+    DEFAULT_CHAT_FRAME:AddMessage(neonGreen .. "/infusionwidget" .. reset .. " or " .. neonGreen .. "/infw" .. reset .. " - opens placeholder trackers for positioning outside raids.")
 end
 
 local function SyncSelectionsToTrackedData()
@@ -117,27 +117,16 @@ local function RefreshTrackerWindowsFromSelections()
     end
 end
 
-local actionBtnWidth = 58
+local actionBtnWidth = 74
 local actionBtnHeight = 24
-local actionGap = 6
-local actionYOffset = 110 -- 65
-local halfSeparation = math.floor((actionBtnWidth + actionGap) / 2)
+local actionYOffset = 110 -- 65 -> 110 -> ?
 
--- The "Scan" Button
-local scanBtn = CreateFrame("Button", "InfusionScanButton", mainUI, "UIPanelButtonTemplate")
-scanBtn:SetWidth(actionBtnWidth)
-scanBtn:SetHeight(actionBtnHeight)
-scanBtn:SetPoint("BOTTOM", mainUI, "BOTTOM", -halfSeparation, actionYOffset)
-scanBtn:SetText("Scan")
-scanBtn:SetScript("OnClick", function()
-    Infusion.ScanRaid()
-end)
 
 -- The "Help" Button
 local helpBtn = CreateFrame("Button", "InfusionHelpButton", mainUI, "UIPanelButtonTemplate")
 helpBtn:SetWidth(actionBtnWidth)
 helpBtn:SetHeight(actionBtnHeight)
-helpBtn:SetPoint("BOTTOM", mainUI, "BOTTOM", halfSeparation, actionYOffset)
+helpBtn:SetPoint("BOTTOM", mainUI, "BOTTOM", 0, actionYOffset)
 helpBtn:SetText("Help")
 helpBtn:SetScript("OnClick", function()
     PrintHelp()
@@ -154,7 +143,7 @@ end)
 getglobal(trackInnervateCheck:GetName() .. "Text"):SetText("Track Innervate")
 
 local trackRebirthCheck = CreateFrame("CheckButton", "InfusionTrackRebirthCheck", mainUI, "UICheckButtonTemplate")
-trackRebirthCheck:SetPoint("TOPLEFT", trackInnervateCheck, "BOTTOMLEFT", 0, 4)
+trackRebirthCheck:SetPoint("TOPLEFT", trackInnervateCheck, "BOTTOMLEFT", 0, 2)
 trackRebirthCheck:SetScript("OnClick", function()
     Infusion.TrackRebirthEnabled = this:GetChecked() and true or false
     Infusion.SaveOptionPrefs()
@@ -163,13 +152,14 @@ end)
 getglobal(trackRebirthCheck:GetName() .. "Text"):SetText("Track Rebirth")
 
 local compactCheck = CreateFrame("CheckButton", "InfusionCompactCheck", mainUI, "UICheckButtonTemplate")
-compactCheck:SetPoint("TOPLEFT", trackRebirthCheck, "BOTTOMLEFT", 0, 4)
+compactCheck:SetPoint("TOPLEFT", trackRebirthCheck, "BOTTOMLEFT", 0, 2)
 compactCheck:SetScript("OnClick", function()
     Infusion.CompactEnabled = this:GetChecked() and true or false
     Infusion.SaveOptionPrefs()
     RefreshTrackerWindowsFromSelections()
 end)
 getglobal(compactCheck:GetName() .. "Text"):SetText("Compact")
+
 
 function Infusion.SyncMainUIFromPrefs()
     trackInnervateCheck:SetChecked(Infusion.TrackInnervateEnabled)
