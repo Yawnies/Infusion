@@ -18,7 +18,7 @@ The **Help** button displays the available commands.
 Above is a comparison between the default and the 'Compact' widgets. Both have the same functionality.
 ### Commands
 `/infusion`: opens/closes the main menu.  
-`/infusionwidget` or `/infw`: opens placeholder tracker widgets for positioning configuration outside of a raid. Can not be used otherwise.
+`/infusionwidget` or `/infw`: opens placeholder tracker widgets for positioning configuration outside of a raid. Can not be used otherwise.  
 `/infusionclose` or `/infc`: closes the tracking widgets. Can be used only if closing the configuration widgets OR if the raid does not have any druids in it.
 ## Tips/Caveats
 * If you disconnect or leave mid raid, the cooldowns **will reset**. This is unavoidable.
